@@ -1,0 +1,82 @@
+---
+### pre-requirements ###
+# update apt-get
+- name: Update apt-get
+  apt: update_cache=yes
+
+# the tasks for installing zoho upload tool
+- name: Install unzip
+  apt: pkg=unzip state=latest
+
+# java dependency
+- name: Install libc6-i386
+  apt: pkg=libc6-i386 state=latest
+
+
+### install zoho upload tool ###
+- name: Create Upload tool folder if not exists
+  file:
+    path: '{{ zoho.tool_dest_folder|default("/usr/local/") }}'
+    state: directory
+    mode: 0755
+    recurse: yes
+
+- name: Download Zoho Upload Tool
+  get_url:
+    url: https://css.zohostatic.com/db/api/v8_m2/ZohoAnalyticsUploadTool_Linux.zip
+    dest: '{{ zoho.tool_dest_folder|default("/usr/local/") }}ZohoAnalyticsUploadTool_Linux.zip'
+
+- name: Unzip Zoho Upload Tool
+  unarchive:
+    src: '{{ zoho.tool_dest_folder|default("/usr/local/") }}ZohoAnalyticsUploadTool_Linux.zip'
+    dest: '{{ zoho.tool_dest_folder|default("/usr/local/") }}'
+    copy: "no"
+    mode: 700
+
+- name: Remove Zoho Upload Tool archive
+  file:
+    path: '{{ zoho.tool_dest_folder|default("/usr/local/") }}ZohoAnalyticsUploadTool_Linux.zip'
+    state: absent
+
+### install MySQL connector
+- name: Download Mysql connector
+  get_url:
+    url: http://dev.mysql.com/get/Downloads/Connector-J/mysql-connector-java-5.1.40.tar.gz
+    dest: '{{ zoho.tool_dest_folder|default("/usr/local/") }}mysql-connector-java-5.1.40.tar.gz'
+
+# unzip Zoho Upload Tool
+- name: Unzip Mysql connector
+  unarchive:
+    src: '{{ zoho.tool_dest_folder|default("/usr/local/") }}mysql-connector-java-5.1.40.tar.gz'
+    dest: '{{ zoho.tool_dest_folder|default("/usr/local/") }}'
+    copy: "no"
+
+# copy mysql connector
+- name: Copy Mysql connector to Zoho Upload Tool
+  command: 'cp {{ zoho.tool_dest_folder|default("/usr/local/") }}mysql-connector-java-5.1.40/mysql-connector-java-5.1.40-bin.jar {{ zoho.tool_dest_folder|default("/usr/local/") }}ZohoAnalytics/UploadTool/lib/mysql-connector-java-5.1.40-bin.jar'
+
+# remove downloaded file
+- name: Remove Mysql connector archive
+  file:
+    path: '{{ zoho.tool_dest_folder|default("/usr/local/") }}mysql-connector-java-5.1.40.tar.gz'
+    state: absent
+
+# remove mysql connector folder
+- name: Remove Mysql connector folder
+  file:
+    path: '{{ zoho.tool_dest_folder|default("/usr/local/") }}mysql-connector-java-5.1.40'
+    state: absent
+
+### application setup ###
+### we'll need a file for TRUNCATEADD and one for UPDATEADD
+# copy UploadSH script to create one for truncate
+- name: Create an UploadSh script for truncate add
+  command: 'cp {{ zoho.tool_dest_folder|default("/usr/local/") }}ZohoAnalytics/UploadTool/bin/UploadFromDB.sh {{ zoho.tool_dest_folder|default("/usr/local/") }}ZohoAnalytics/UploadTool/bin/UploadFromDBWithTruncate.sh'
+
+# modify the uploadShWithTruncate file to use truncate database sql queries
+- name: Modify UploadFromDBWithTruncate.sh to use the truncate sql file
+  replace:
+    dest: '{{ zoho.tool_dest_folder|default("/usr/local/") }}ZohoAnalytics/UploadTool/bin/UploadFromDBWithTruncate.sh'
+    regexp: 'database_sql_queries.xml'
+    replace: 'database_sql_queries_with_truncate.xml'
+
